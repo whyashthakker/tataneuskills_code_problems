@@ -1,0 +1,53 @@
+# prediction.py
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from fuel_efficiency_predictor import CarFuelEfficiencyPredictor
+
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the full path to the CSV file
+csv_path = os.path.join(current_dir, 'car_fuel_efficiency_data.csv')
+
+# Load the dataset
+try:
+    df = pd.read_csv(csv_path)
+except FileNotFoundError:
+    print(f"Error: The file 'car_fuel_efficiency_data.csv' was not found in the directory: {current_dir}")
+    print("Please make sure the CSV file is in the same directory as this script.")
+    exit(1)
+
+# Extract the features (X) and target (y)
+X = df['weight_kg'].values
+y = df['fuel_efficiency_l_100km'].values
+
+# Create and train the model
+model = CarFuelEfficiencyPredictor()
+model.train(X, y)
+
+# Make predictions for new car weights
+new_car_weights = np.array([1350, 1650, 1950])
+predictions = model.predict(new_car_weights)
+
+print("Predictions for new car weights:")
+for weight, efficiency in zip(new_car_weights, predictions):
+    print(f"Car weight: {weight} kg, Predicted Fuel Efficiency: {efficiency:.2f} L/100km")
+
+# Calculate and print error metrics
+mse = model.mean_squared_error(X, y)
+r2 = model.r_squared(X, y)
+print(f"\nMean Squared Error: {mse:.4f}")
+print(f"R-squared Score: {r2:.4f}")
+
+# Visualize the data and predictions
+plt.scatter(X, y, color='blue', alpha=0.5, label='Actual Data')
+plt.plot(X, model.predict(X), color='red', label='Prediction Line')
+plt.scatter(new_car_weights, predictions, color='green', marker='x', s=100, label='New Predictions')
+plt.xlabel('Car Weight (kg)')
+plt.ylabel('Fuel Efficiency (L/100km)')
+plt.title('Car Fuel Efficiency Prediction')
+plt.legend()
+plt.show()
