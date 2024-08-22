@@ -1,0 +1,22 @@
+Python installation	
+python https://www.python.org/downloads/
+pip
+
+Notebook installation
+jupyter
+
+Python libraries
+pandas
+numpy
+matplotlib
+scikit-learn
+opencv-python
+
+Git installation
+sudo apt-get install git for linux
+https://git-scm.com/download/win for windows 
+
+Ide installation
+Vscode https://code.visualstudio.com/
+
+
