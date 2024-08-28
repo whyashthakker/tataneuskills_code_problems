@@ -1,131 +1,100 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import time
+import pygame
+import random
 
-class AutonomousCar:
-    def __init__(self, states, actions, learning_rate=0.1, discount_factor=0.9, epsilon=0.1):
-        self.q_table = np.zeros((states, actions))
-        self.learning_rate = learning_rate
-        self.discount_factor = discount_factor
-        self.epsilon = epsilon
+# Initialize Pygame
+pygame.init()
 
-    def choose_action(self, state):
-        if np.random.uniform(0, 1) < self.epsilon:
-            return np.random.choice(self.q_table.shape[1])  # Explore
-        else:
-            return np.argmax(self.q_table[state, :])  # Exploit
+# Set up the game window
+WIDTH = 800
+HEIGHT = 600
+window = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Simple Car Game")
 
-    def learn(self, state, action, reward, next_state):
-        predict = self.q_table[state, action]
-        target = reward + self.discount_factor * np.max(self.q_table[next_state, :])
-        self.q_table[state, action] += self.learning_rate * (target - predict)
+# Colors
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
 
-class DrivingEnvironment:
-    def __init__(self, size=5):
-        self.size = size
-        self.actions = ['left', 'stay', 'right']
-        self.reset()
+# Car properties
+car_width = 50
+car_height = 100
+car_x = WIDTH // 2 - car_width // 2
+car_y = HEIGHT - car_height - 10
 
-    def reset(self):
-        self.car_position = self.size // 2
-        self.obstacle_position = np.random.randint(0, self.size)
-        return self.car_position
+# Obstacle properties
+obstacle_width = 100
+obstacle_height = 100
+obstacle_speed = 5
+obstacles = []
 
-    def step(self, action):
-        # Move car
-        if action == 0:  # left
-            self.car_position = max(0, self.car_position - 1)
-        elif action == 2:  # right
-            self.car_position = min(self.size - 1, self.car_position + 1)
+# Game properties
+clock = pygame.time.Clock()
+score = 0
+font = pygame.font.Font(None, 36)
 
-        # Check for collision or successful navigation
-        if self.car_position == self.obstacle_position:
-            reward = -10  # Collision
-            done = True
-        elif self.car_position == self.size // 2:
-            reward = 1  # Stayed in the middle lane
-            done = False
-        else:
-            reward = -1  # Moved away from middle lane
-            done = False
+def draw_car(x, y):
+    pygame.draw.rect(window, BLUE, (x, y, car_width, car_height))
 
-        return self.car_position, reward, done
+def draw_obstacle(x, y):
+    pygame.draw.rect(window, RED, (x, y, obstacle_width, obstacle_height))
 
-def visualize_environment(ax, env, car_position, action=None, reward=None, total_reward=0):
-    ax.clear()
-    road = ['_'] * env.size
-    road[env.obstacle_position] = 'X'
-    road[car_position] = 'C'
+def show_score():
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    window.blit(score_text, (10, 10))
+
+def game_over():
+    game_over_text = font.render("Game Over!", True, WHITE)
+    window.blit(game_over_text, (WIDTH // 2 - 70, HEIGHT // 2 - 18))
+    pygame.display.update()
+    pygame.time.wait(2000)
+
+def main():
+    global car_x, score
     
-    ax.set_xlim(-0.5, env.size - 0.5)
-    ax.set_ylim(-1, 1)
-    ax.set_yticks([])
-    ax.set_xticks(range(env.size))
-    ax.set_xticklabels(road)
-    
-    ax.axhline(y=0, color='k', linestyle='-', linewidth=2)
-    ax.plot(car_position, 0, 'bo', markersize=20, label='Car')
-    ax.plot(env.obstacle_position, 0, 'rx', markersize=20, label='Obstacle')
-    
-    if action is not None:
-        ax.set_title(f"Action: {env.actions[action]}", fontsize=16)
-    if reward is not None:
-        color = 'green' if reward > 0 else 'red'
-        ax.text(env.size/2, 0.5, f"Reward: {reward}", ha='center', va='center', fontsize=16, color=color)
-    ax.text(env.size/2, -0.5, f"Total Reward: {total_reward}", ha='center', va='center', fontsize=16)
-    
-    ax.legend(loc='upper left')
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-def train_and_visualize(episodes=10, delay=1):
-    env = DrivingEnvironment()
-    car = AutonomousCar(env.size, len(env.actions))
-    rewards = []
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and car_x > 0:
+            car_x -= 5
+        if keys[pygame.K_RIGHT] and car_x < WIDTH - car_width:
+            car_x += 5
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plt.ion()  # Turn on interactive mode
+        # Create new obstacles
+        if len(obstacles) < 3 and random.randint(1, 30) == 1:
+            obstacle_x = random.randint(0, WIDTH - obstacle_width)
+            obstacles.append([obstacle_x, -obstacle_height])
 
-    for episode in range(episodes):
-        state = env.reset()
-        total_reward = 0
-        done = False
-        step = 0
+        # Move and remove obstacles
+        for obstacle in obstacles:
+            obstacle[1] += obstacle_speed
+            if obstacle[1] > HEIGHT:
+                obstacles.remove(obstacle)
+                score += 1
 
-        print(f"Episode {episode + 1}")
-        visualize_environment(ax, env, state)
-        plt.pause(delay)
+        # Check for collisions
+        for obstacle in obstacles:
+            if car_y < obstacle[1] + obstacle_height and \
+               car_y + car_height > obstacle[1] and \
+               car_x < obstacle[0] + obstacle_width and \
+               car_x + car_width > obstacle[0]:
+                game_over()
+                return
 
-        while not done:
-            action = car.choose_action(state)
-            next_state, reward, done = env.step(action)
-            car.learn(state, action, reward, next_state)
-            
-            step += 1
-            total_reward += reward
-            visualize_environment(ax, env, next_state, action, reward, total_reward)
-            plt.pause(delay)
-            
-            state = next_state
+        # Draw everything
+        window.fill((0, 0, 0))
+        draw_car(car_x, car_y)
+        for obstacle in obstacles:
+            draw_obstacle(obstacle[0], obstacle[1])
+        show_score()
 
-        rewards.append(total_reward)
-        print(f"Episode {episode + 1} finished. Total reward: {total_reward}")
-        plt.pause(delay)
+        pygame.display.update()
+        clock.tick(60)
 
-    plt.ioff()  # Turn off interactive mode
-    plt.close()
+    pygame.quit()
 
-    return car, rewards
-
-# Train the model with visualization
-trained_car, reward_history = train_and_visualize(episodes=5, delay=1)
-
-# Plot the rewards
-plt.figure(figsize=(10, 5))
-plt.plot(reward_history)
-plt.title('Reward History')
-plt.xlabel('Episode')
-plt.ylabel('Total Reward')
-plt.show()
-
-print("\nFinal Q-table:")
-print(trained_car.q_table)
+if __name__ == "__main__":
+    main()
